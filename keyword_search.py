@@ -26,11 +26,14 @@ def search_movies(movies: list[dict], query: str, max_results: int = 5) -> list[
     # Prepare translation table to remove punctuation
     table = str.maketrans('', '', string.punctuation)
     query_clean = query.lower().translate(table)
+    query_tokens = [t for t in query_clean.split() if t]
 
     results = []
     for movie in movies:
         title_clean = movie["title"].lower().translate(table)
-        if query_clean in title_clean:
+        title_tokens = [t for t in title_clean.split() if t]
+        # Match if any query token is a substring of any title token
+        if any(qt in tt for qt in query_tokens for tt in title_tokens):
             results.append(movie)
 
     # Sort by ID ascending and limit results
