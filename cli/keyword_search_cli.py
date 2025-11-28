@@ -1,6 +1,13 @@
 #!/usr/bin/env python3
 
 import argparse
+import sys
+from pathlib import Path
+
+# Add parent directory to path to import keyword_search module
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from keyword_search import load_movies, search_movies
 
 
 def main() -> None:
@@ -15,6 +22,17 @@ def main() -> None:
     match args.command:
         case "search":
             print(f"Searching for: {args.query}")
+            
+            # Load movies data
+            movies_path = Path(__file__).parent.parent / "data" / "movies.json"
+            movies = load_movies(movies_path)
+            
+            # Search for matching movies
+            results = search_movies(movies, args.query)
+            
+            # Print results
+            for idx, movie in enumerate(results, 1):
+                print(f"{idx}. {movie['title']}")
         case _:
             parser.print_help()
 
