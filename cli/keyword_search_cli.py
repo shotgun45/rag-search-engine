@@ -28,6 +28,10 @@ def main() -> None:
     idf_parser = subparsers.add_parser("idf", help="Get IDF for a term")
     idf_parser.add_argument("term", type=str, help="Term to calculate IDF for")
 
+    tfidf_parser = subparsers.add_parser("tfidf", help="Get TF-IDF score for a document and term")
+    tfidf_parser.add_argument("doc_id", type=int, help="Document ID")
+    tfidf_parser.add_argument("term", type=str, help="Term to calculate TF-IDF for")
+
     args = parser.parse_args()
 
     match args.command:
@@ -97,6 +101,17 @@ def main() -> None:
                 sys.exit(1)
             idf = index.get_idf(args.term)
             print(f"Inverse document frequency of '{args.term}': {idf:.2f}")
+        case "tfidf":
+            index = InvertedIndex()
+            try:
+                index.load()
+            except FileNotFoundError:
+                print("Error: Inverted index not found. Please run the build command first.")
+                sys.exit(1)
+            tf = index.get_tf(args.doc_id, args.term)
+            idf = index.get_idf(args.term)
+            tf_idf = tf * idf
+            print(f"TF-IDF score of '{args.term}' in document '{args.doc_id}': {tf_idf:.2f}")
         case _:
             parser.print_help()
 
