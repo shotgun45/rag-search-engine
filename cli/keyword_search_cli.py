@@ -26,28 +26,52 @@ def main() -> None:
     match args.command:
         case "search":
             print(f"Searching for: {args.query}")
-            
-            # Load movies data
-            movies_path = Path(__file__).parent.parent / "data" / "movies.json"
-            movies = load_movies(movies_path)
-            
-            # Search for matching movies
-            results = search_movies(movies, args.query)
-            
+            index = InvertedIndex()
+            try:
+                index.load()
+            except FileNotFoundError:
+                print("Error: Inverted index not found. Please run the build command first.")
+                sys.exit(1)
+            # Tokenize query (same logic as index)
+            import string
+            from nltk.stem import PorterStemmer
+            table = str.maketrans('', '', string.punctuation)
+            stemmer = PorterStemmer()
+            tokens = [t for t in args.query.lower().translate(table).split() if t]
+            # Remove stop words
+            stopwords_path = Path(__file__).parent.parent / "data" / "stopwords.txt"
+            try:
+                with open(stopwords_path, "r") as sw_file:
+                    stopwords = set(sw_file.read().splitlines())
+            except Exception:
+                stopwords = set()
+            tokens = [t for t in tokens if t not in stopwords]
+            tokens = [stemmer.stem(t) for t in tokens]
+            # Collect up to 5 unique matching doc IDs
+            found = set()
+            for token in tokens:
+                for doc_id in index.get_documents(token):
+                    if doc_id not in found:
+                        found.add(doc_id)
+                        if len(found) == 5:
+                            break
+                if len(found) == 5:
+                    break
+            if not found:
+                print("No documents found for this query.")
+                return
             # Print results
-            for idx, movie in enumerate(results, 1):
-                print(f"{idx}. {movie['title']}")
+            for idx, doc_id in enumerate(sorted(found), 1):
+                movie = index.docmap[doc_id]
+                print(f"{idx}. {movie['title']} (ID: {doc_id})")
         case "build":
             # Load movies data
             movies_path = Path(__file__).parent.parent / "data" / "movies.json"
             movies = load_movies(movies_path)
-            
             # Build inverted index
             index = InvertedIndex()
             index.build(movies)
             index.save()
-            docs = index.get_documents('merida')
-            print(f"First document for token 'merida' = {docs[0]}")
         case _:
             parser.print_help()
 
