@@ -1,6 +1,5 @@
 import json
 from pathlib import Path
-
 import string
 
 
@@ -28,10 +27,20 @@ def search_movies(movies: list[dict], query: str, max_results: int = 5) -> list[
     query_clean = query.lower().translate(table)
     query_tokens = [t for t in query_clean.split() if t]
 
+    # Load stop words from file
+    stopwords_path = Path(__file__).parent / "data" / "stopwords.txt"
+    with open(stopwords_path, "r") as sw_file:
+        stopwords = set(sw_file.read().splitlines())
+
+    # Remove stop words from query tokens
+    query_tokens = [t for t in query_tokens if t not in stopwords]
+
     results = []
     for movie in movies:
         title_clean = movie["title"].lower().translate(table)
         title_tokens = [t for t in title_clean.split() if t]
+        # Remove stop words from title tokens
+        title_tokens = [t for t in title_tokens if t not in stopwords]
         # Match if any query token is a substring of any title token
         if any(qt in tt for qt in query_tokens for tt in title_tokens):
             results.append(movie)
