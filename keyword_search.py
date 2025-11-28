@@ -1,6 +1,8 @@
 import json
 from pathlib import Path
 
+import string
+
 
 def load_movies(movies_path: str | Path) -> list[dict]:
     """Load movies from JSON file."""
@@ -20,11 +22,17 @@ def search_movies(movies: list[dict], query: str, max_results: int = 5) -> list[
     Returns:
         List of matching movies, sorted by ID, limited to max_results
     """
+
+    # Prepare translation table to remove punctuation
+    table = str.maketrans('', '', string.punctuation)
+    query_clean = query.lower().translate(table)
+
     results = []
     for movie in movies:
-        if query.lower() in movie["title"].lower():
+        title_clean = movie["title"].lower().translate(table)
+        if query_clean in title_clean:
             results.append(movie)
-    
+
     # Sort by ID ascending and limit results
     results = sorted(results, key=lambda x: x["id"])[:max_results]
     return results
