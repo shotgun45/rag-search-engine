@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 import string
+from nltk.stem import PorterStemmer
 
 
 def load_movies(movies_path: str | Path) -> list[dict]:
@@ -35,14 +36,20 @@ def search_movies(movies: list[dict], query: str, max_results: int = 5) -> list[
     # Remove stop words from query tokens
     query_tokens = [t for t in query_tokens if t not in stopwords]
 
+    # Stem query tokens
+    stemmer = PorterStemmer()
+    query_tokens_stemmed = [stemmer.stem(t) for t in query_tokens]
+
     results = []
     for movie in movies:
         title_clean = movie["title"].lower().translate(table)
         title_tokens = [t for t in title_clean.split() if t]
         # Remove stop words from title tokens
         title_tokens = [t for t in title_tokens if t not in stopwords]
-        # Match if any query token is a substring of any title token
-        if any(qt in tt for qt in query_tokens for tt in title_tokens):
+        # Stem title tokens
+        title_tokens_stemmed = [stemmer.stem(t) for t in title_tokens]
+        # Match if any stemmed query token is a substring of any stemmed title token
+        if any(qt in tt for qt in query_tokens_stemmed for tt in title_tokens_stemmed):
             results.append(movie)
 
     # Sort by ID ascending and limit results
