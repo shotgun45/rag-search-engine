@@ -120,3 +120,16 @@ class InvertedIndex:
             raise ValueError("Term must be a single token after tokenization.")
         token = tokenized[0]
         return self.term_frequencies.get(doc_id, {}).get(token, 0)
+
+    def get_idf(self, term):
+        """
+        Calculate and return the IDF for a given term.
+        Uses formula: log((N + 1) / (df + 1))
+        """
+        import math
+        term = term.lower().translate(self.table)
+        N = len(self.docmap)
+        doc_ids = self.get_documents(term)
+        df = len(doc_ids)
+        idf = math.log((N + 1) / (df + 1))
+        return idf

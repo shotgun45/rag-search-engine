@@ -25,6 +25,9 @@ def main() -> None:
     tf_parser.add_argument("doc_id", type=int, help="Document ID")
     tf_parser.add_argument("term", type=str, help="Term to check frequency for")
 
+    idf_parser = subparsers.add_parser("idf", help="Get IDF for a term")
+    idf_parser.add_argument("term", type=str, help="Term to calculate IDF for")
+
     args = parser.parse_args()
 
     match args.command:
@@ -85,6 +88,15 @@ def main() -> None:
                 sys.exit(1)
             tf = index.get_tf(args.doc_id, args.term)
             print(tf)
+        case "idf":
+            index = InvertedIndex()
+            try:
+                index.load()
+            except FileNotFoundError:
+                print("Error: Inverted index not found. Please run the build command first.")
+                sys.exit(1)
+            idf = index.get_idf(args.term)
+            print(f"Inverse document frequency of '{args.term}': {idf:.2f}")
         case _:
             parser.print_help()
 
