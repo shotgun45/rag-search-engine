@@ -8,6 +8,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from keyword_search import load_movies, search_movies
+from inverted_index import InvertedIndex
+
 
 
 def main() -> None:
@@ -16,6 +18,8 @@ def main() -> None:
 
     search_parser = subparsers.add_parser("search", help="Search movies using BM25")
     search_parser.add_argument("query", type=str, help="Search query")
+
+    build_parser = subparsers.add_parser("build", help="Build and save inverted index")
 
     args = parser.parse_args()
 
@@ -33,6 +37,17 @@ def main() -> None:
             # Print results
             for idx, movie in enumerate(results, 1):
                 print(f"{idx}. {movie['title']}")
+        case "build":
+            # Load movies data
+            movies_path = Path(__file__).parent.parent / "data" / "movies.json"
+            movies = load_movies(movies_path)
+            
+            # Build inverted index
+            index = InvertedIndex()
+            index.build(movies)
+            index.save()
+            docs = index.get_documents('merida')
+            print(f"First document for token 'merida' = {docs[0]}")
         case _:
             parser.print_help()
 
