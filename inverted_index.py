@@ -1,5 +1,6 @@
 import string
 from pathlib import Path
+from collections import Counter
 try:
     from nltk.stem import PorterStemmer
 except ImportError:
@@ -11,6 +12,8 @@ class InvertedIndex:
         self.index = {}
         # Maps doc ID (int) to full document object
         self.docmap = {}
+        # Maps doc ID (int) to Counter objects for term counts
+        self.term_frequencies = {}
         # Prepare translation table to remove punctuation
         self.table = str.maketrans('', '', string.punctuation)
         # Load stop words from file
@@ -33,7 +36,12 @@ class InvertedIndex:
         tokens = [t for t in tokens if t not in self.stopwords]
         if self.stemmer:
             tokens = [self.stemmer.stem(t) for t in tokens]
+        # Track term frequencies
+        if doc_id not in self.term_frequencies:
+            from collections import Counter
+            self.term_frequencies[doc_id] = Counter()
         for token in tokens:
+            self.term_frequencies[doc_id][token] += 1
             if token not in self.index:
                 self.index[token] = set()
             self.index[token].add(doc_id)
@@ -65,7 +73,7 @@ class InvertedIndex:
 
     def save(self):
         """
-        Save index and docmap to disk using pickle.
+        Save index, docmap, and term_frequencies to disk using pickle.
         Creates cache directory if it doesn't exist.
         """
         import os
@@ -76,10 +84,12 @@ class InvertedIndex:
             pickle.dump(self.index, f)
         with open(os.path.join(cache_dir, "docmap.pkl"), "wb") as f:
             pickle.dump(self.docmap, f)
+        with open(os.path.join(cache_dir, "term_frequencies.pkl"), "wb") as f:
+            pickle.dump(self.term_frequencies, f)
 
     def load(self):
         """
-        Load index and docmap from disk using pickle.
+        Load index, docmap, and term_frequencies from disk using pickle.
         Raises FileNotFoundError if files do not exist.
         """
         import os
@@ -87,9 +97,26 @@ class InvertedIndex:
         cache_dir = "cache"
         index_path = os.path.join(cache_dir, "index.pkl")
         docmap_path = os.path.join(cache_dir, "docmap.pkl")
-        if not os.path.exists(index_path) or not os.path.exists(docmap_path):
-            raise FileNotFoundError("Index or docmap file not found in cache directory.")
+        tf_path = os.path.join(cache_dir, "term_frequencies.pkl")
+        if not (os.path.exists(index_path) and os.path.exists(docmap_path) and os.path.exists(tf_path)):
+            raise FileNotFoundError("Index, docmap, or term_frequencies file not found in cache directory.")
         with open(index_path, "rb") as f:
             self.index = pickle.load(f)
         with open(docmap_path, "rb") as f:
             self.docmap = pickle.load(f)
+        with open(tf_path, "rb") as f:
+            self.term_frequencies = pickle.load(f)
+
+    def get_tf(self, doc_id, term):
+        """
+        Return the frequency of the token in the document with the given ID.
+        Tokenize and stem the term. If more than one token, raise an exception.
+        """
+        tokenized = [t for t in term.lower().translate(self.table).split() if t]
+        tokenized = [t for t in tokenized if t not in self.stopwords]
+        if self.stemmer:
+            tokenized = [self.stemmer.stem(t) for t in tokenized]
+        if len(tokenized) != 1:
+            raise ValueError("Term must be a single token after tokenization.")
+        token = tokenized[0]
+        return self.term_frequencies.get(doc_id, {}).get(token, 0)
