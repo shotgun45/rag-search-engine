@@ -10,8 +10,6 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from keyword_search import load_movies, search_movies
 from inverted_index import InvertedIndex
 
-
-
 def main() -> None:
     parser = argparse.ArgumentParser(description="Keyword Search CLI")
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
@@ -31,6 +29,11 @@ def main() -> None:
     tfidf_parser = subparsers.add_parser("tfidf", help="Get TF-IDF score for a document and term")
     tfidf_parser.add_argument("doc_id", type=int, help="Document ID")
     tfidf_parser.add_argument("term", type=str, help="Term to calculate TF-IDF for")
+
+    bm25_idf_parser = subparsers.add_parser(
+        'bm25idf', help="Get BM25 IDF score for a given term"
+    )
+    bm25_idf_parser.add_argument("term", type=str, help="Term to get BM25 IDF for")
 
     args = parser.parse_args()
 
@@ -112,8 +115,23 @@ def main() -> None:
             idf = index.get_idf(args.term)
             tf_idf = tf * idf
             print(f"TF-IDF score of '{args.term}' in document '{args.doc_id}': {tf_idf:.2f}")
+        case "bm25idf":
+            bm25_idf = bm25_idf_command(args.term)
+            print(f"BM25 IDF score of '{args.term}': {bm25_idf:.2f}")
         case _:
             parser.print_help()
+
+def bm25_idf_command(term: str) -> float:
+    """
+    Load the index from disk and calculate BM25 IDF for a term.
+    """
+    index = InvertedIndex()
+    try:
+        index.load()
+    except FileNotFoundError:
+        print("Error: Inverted index not found. Please run the build command first.")
+        sys.exit(1)
+    return index.get_bm25_idf(term)
 
 if __name__ == "__main__":
     main()

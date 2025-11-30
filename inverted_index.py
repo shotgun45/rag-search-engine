@@ -133,3 +133,22 @@ class InvertedIndex:
         df = len(doc_ids)
         idf = math.log((N + 1) / (df + 1))
         return idf
+
+    def get_bm25_idf(self, term: str) -> float:
+        """
+        Calculate and return the BM25 IDF for a given term.
+        Uses formula: log((N - df + 0.5) / (df + 0.5) + 1)
+        """
+        import math
+        tokenized = [t for t in term.lower().translate(self.table).split() if t]
+        tokenized = [t for t in tokenized if t not in self.stopwords]
+        if self.stemmer:
+            tokenized = [self.stemmer.stem(t) for t in tokenized]
+        if len(tokenized) != 1:
+            raise ValueError("Term must be a single token after tokenization.")
+        token = tokenized[0]
+        N = len(self.docmap)
+        doc_ids = self.index.get(token, set())
+        df = len(doc_ids)
+        bm25_idf = math.log((N - df + 0.5) / (df + 0.5) + 1)
+        return bm25_idf
