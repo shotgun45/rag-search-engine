@@ -3,6 +3,8 @@ from pathlib import Path
 import string
 from nltk.stem import PorterStemmer
 
+BM25_K1 = 1.5
+
 
 def load_movies(movies_path: str | Path) -> list[dict]:
     """Load movies from JSON file."""

@@ -7,7 +7,7 @@ from pathlib import Path
 # Add parent directory to path to import keyword_search module
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from keyword_search import load_movies, search_movies
+from keyword_search import load_movies, search_movies, BM25_K1
 from inverted_index import InvertedIndex
 
 def main() -> None:
@@ -34,6 +34,13 @@ def main() -> None:
         'bm25idf', help="Get BM25 IDF score for a given term"
     )
     bm25_idf_parser.add_argument("term", type=str, help="Term to get BM25 IDF for")
+
+    bm25_tf_parser = subparsers.add_parser(
+        "bm25tf", help="Get BM25 TF score for a given document ID and term"
+    )
+    bm25_tf_parser.add_argument("doc_id", type=int, help="Document ID")
+    bm25_tf_parser.add_argument("term", type=str, help="Term to get BM25 TF score for")
+    bm25_tf_parser.add_argument("k1", type=float, nargs='?', default=BM25_K1, help="Tunable BM25 K1 parameter")
 
     args = parser.parse_args()
 
@@ -118,6 +125,9 @@ def main() -> None:
         case "bm25idf":
             bm25_idf = bm25_idf_command(args.term)
             print(f"BM25 IDF score of '{args.term}': {bm25_idf:.2f}")
+        case "bm25tf":
+            bm25_tf = bm25_tf_command(args.doc_id, args.term, args.k1)
+            print(f"BM25 TF score of '{args.term}' in document '{args.doc_id}': {bm25_tf:.2f}")
         case _:
             parser.print_help()
 
@@ -132,6 +142,18 @@ def bm25_idf_command(term: str) -> float:
         print("Error: Inverted index not found. Please run the build command first.")
         sys.exit(1)
     return index.get_bm25_idf(term)
+
+def bm25_tf_command(doc_id: int, term: str, k1: float = BM25_K1) -> float:
+    """
+    Load the index from disk and calculate BM25 TF for a document and term.
+    """
+    index = InvertedIndex()
+    try:
+        index.load()
+    except FileNotFoundError:
+        print("Error: Inverted index not found. Please run the build command first.")
+        sys.exit(1)
+    return index.get_bm25_tf(doc_id, term, k1)
 
 if __name__ == "__main__":
     main()

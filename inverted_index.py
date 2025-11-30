@@ -152,3 +152,12 @@ class InvertedIndex:
         df = len(doc_ids)
         bm25_idf = math.log((N - df + 0.5) / (df + 0.5) + 1)
         return bm25_idf
+
+    def get_bm25_tf(self, doc_id, term, k1=1.5):
+        """
+        Calculate and return the BM25 saturated TF for a given document and term.
+        Uses formula: (tf * (k1 + 1)) / (tf + k1)
+        """
+        tf = self.get_tf(doc_id, term)
+        bm25_tf = (tf * (k1 + 1)) / (tf + k1)
+        return bm25_tf
