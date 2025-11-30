@@ -43,6 +43,10 @@ def main() -> None:
     bm25_tf_parser.add_argument("k1", type=float, nargs='?', default=BM25_K1, help="Tunable BM25 K1 parameter")
     bm25_tf_parser.add_argument("b", type=float, nargs='?', default=BM25_B, help="Tunable BM25 b parameter")
 
+    bm25search_parser = subparsers.add_parser("bm25search", help="Search movies using full BM25 scoring")
+    bm25search_parser.add_argument("query", type=str, help="Search query")
+    bm25search_parser.add_argument("--limit", type=int, default=5, help="Number of results to return (default: 5)")
+
     args = parser.parse_args()
 
     match args.command:
@@ -129,6 +133,20 @@ def main() -> None:
         case "bm25tf":
             bm25_tf = bm25_tf_command(args.doc_id, args.term, args.k1, args.b)
             print(f"BM25 TF score of '{args.term}' in document '{args.doc_id}': {bm25_tf:.2f}")
+        case "bm25search":
+            index = InvertedIndex()
+            try:
+                index.load()
+            except FileNotFoundError:
+                print("Error: Inverted index not found. Please run the build command first.")
+                sys.exit(1)
+            results = index.bm25_search(args.query, args.limit)
+            if not results:
+                print("No results found.")
+            else:
+                for idx, (doc_id, score) in enumerate(results, 1):
+                    movie = index.docmap[doc_id]
+                    print(f"{idx}. ({doc_id}) {movie['title']} - Score: {score:.2f}")
         case _:
             parser.print_help()
 
@@ -155,6 +173,19 @@ def bm25_tf_command(doc_id: int, term: str, k1: float = BM25_K1, b: float = BM25
         print("Error: Inverted index not found. Please run the build command first.")
         sys.exit(1)
     return index.get_bm25_tf(doc_id, term, k1, b)
+
+def bm25_search_command(query: str, limit: int = 5) -> list:
+    """
+    Load the index from disk and perform BM25 search.
+    Returns a list of (doc_id, score) tuples.
+    """
+    index = InvertedIndex()
+    try:
+        index.load()
+    except FileNotFoundError:
+        print("Error: Inverted index not found. Please run the build command first.")
+        sys.exit(1)
+    return index.bm25_search(query, limit)
 
 if __name__ == "__main__":
     main()

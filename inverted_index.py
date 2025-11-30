@@ -178,6 +178,40 @@ class InvertedIndex:
         bm25_tf = (tf * (k1 + 1)) / (tf + k1 * length_norm)
         return bm25_tf
 
+    def bm25(self, doc_id, term):
+        """
+        Calculate and return the full BM25 score for a document and term.
+        Returns bm25_tf * bm25_idf.
+        """
+        bm25_tf = self.get_bm25_tf(doc_id, term)
+        bm25_idf = self.get_bm25_idf(term)
+        return bm25_tf * bm25_idf
+
+    def bm25_search(self, query, limit):
+        """
+        Search for documents using BM25 scoring.
+        Returns a list of (doc_id, score) tuples sorted by score in descending order.
+        """
+        # Tokenize query using the same logic as add_document
+        tokens = [t for t in query.lower().translate(self.table).split() if t]
+        tokens = [t for t in tokens if t not in self.stopwords]
+        if self.stemmer:
+            tokens = [self.stemmer.stem(t) for t in tokens]
+        
+        # Initialize scores dictionary
+        scores = {}
+        
+        # Calculate BM25 scores for all documents in the index
+        for doc_id in self.docmap.keys():
+            total_score = 0.0
+            for token in tokens:
+                total_score += self.bm25(doc_id, token)
+            scores[doc_id] = total_score
+        
+        # Sort by score in descending order and return top limit
+        sorted_docs = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+        return sorted_docs[:limit]
+
     def __get_avg_doc_length(self) -> float:
         """
         Calculate and return the average document length across all documents.
