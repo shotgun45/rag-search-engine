@@ -7,7 +7,7 @@ from pathlib import Path
 # Add parent directory to path to import keyword_search module
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from keyword_search import load_movies, search_movies, BM25_K1
+from keyword_search import load_movies, search_movies, BM25_K1, BM25_B
 from inverted_index import InvertedIndex
 
 def main() -> None:
@@ -41,6 +41,7 @@ def main() -> None:
     bm25_tf_parser.add_argument("doc_id", type=int, help="Document ID")
     bm25_tf_parser.add_argument("term", type=str, help="Term to get BM25 TF score for")
     bm25_tf_parser.add_argument("k1", type=float, nargs='?', default=BM25_K1, help="Tunable BM25 K1 parameter")
+    bm25_tf_parser.add_argument("b", type=float, nargs='?', default=BM25_B, help="Tunable BM25 b parameter")
 
     args = parser.parse_args()
 
@@ -126,7 +127,7 @@ def main() -> None:
             bm25_idf = bm25_idf_command(args.term)
             print(f"BM25 IDF score of '{args.term}': {bm25_idf:.2f}")
         case "bm25tf":
-            bm25_tf = bm25_tf_command(args.doc_id, args.term, args.k1)
+            bm25_tf = bm25_tf_command(args.doc_id, args.term, args.k1, args.b)
             print(f"BM25 TF score of '{args.term}' in document '{args.doc_id}': {bm25_tf:.2f}")
         case _:
             parser.print_help()
@@ -143,7 +144,7 @@ def bm25_idf_command(term: str) -> float:
         sys.exit(1)
     return index.get_bm25_idf(term)
 
-def bm25_tf_command(doc_id: int, term: str, k1: float = BM25_K1) -> float:
+def bm25_tf_command(doc_id: int, term: str, k1: float = BM25_K1, b: float = BM25_B) -> float:
     """
     Load the index from disk and calculate BM25 TF for a document and term.
     """
@@ -153,7 +154,7 @@ def bm25_tf_command(doc_id: int, term: str, k1: float = BM25_K1) -> float:
     except FileNotFoundError:
         print("Error: Inverted index not found. Please run the build command first.")
         sys.exit(1)
-    return index.get_bm25_tf(doc_id, term, k1)
+    return index.get_bm25_tf(doc_id, term, k1, b)
 
 if __name__ == "__main__":
     main()

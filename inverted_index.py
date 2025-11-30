@@ -1,10 +1,13 @@
 import string
+import os
 from pathlib import Path
 from collections import Counter
 try:
     from nltk.stem import PorterStemmer
 except ImportError:
     PorterStemmer = None
+
+CACHE_DIR = "cache"
 
 class InvertedIndex:
     def __init__(self):
@@ -14,6 +17,8 @@ class InvertedIndex:
         self.docmap = {}
         # Maps doc ID (int) to Counter objects for term counts
         self.term_frequencies = {}
+        # Maps doc ID (int) to document length
+        self.doc_lengths = {}
         # Prepare translation table to remove punctuation
         self.table = str.maketrans('', '', string.punctuation)
         # Load stop words from file
@@ -25,6 +30,8 @@ class InvertedIndex:
             self.stopwords = set()
         # Stemmer
         self.stemmer = PorterStemmer() if PorterStemmer else None
+        # Cache file paths
+        self.doc_lengths_path = os.path.join(CACHE_DIR, "doc_lengths.pkl")
 
     def add_document(self, doc_id, text, doc_obj=None):
         """
@@ -36,6 +43,8 @@ class InvertedIndex:
         tokens = [t for t in tokens if t not in self.stopwords]
         if self.stemmer:
             tokens = [self.stemmer.stem(t) for t in tokens]
+        # Track document length
+        self.doc_lengths[doc_id] = len(tokens)
         # Track term frequencies
         if doc_id not in self.term_frequencies:
             from collections import Counter
@@ -73,7 +82,7 @@ class InvertedIndex:
 
     def save(self):
         """
-        Save index, docmap, and term_frequencies to disk using pickle.
+        Save index, docmap, term_frequencies, and doc_lengths to disk using pickle.
         Creates cache directory if it doesn't exist.
         """
         import os
@@ -86,10 +95,12 @@ class InvertedIndex:
             pickle.dump(self.docmap, f)
         with open(os.path.join(cache_dir, "term_frequencies.pkl"), "wb") as f:
             pickle.dump(self.term_frequencies, f)
+        with open(self.doc_lengths_path, "wb") as f:
+            pickle.dump(self.doc_lengths, f)
 
     def load(self):
         """
-        Load index, docmap, and term_frequencies from disk using pickle.
+        Load index, docmap, term_frequencies, and doc_lengths from disk using pickle.
         Raises FileNotFoundError if files do not exist.
         """
         import os
@@ -98,14 +109,16 @@ class InvertedIndex:
         index_path = os.path.join(cache_dir, "index.pkl")
         docmap_path = os.path.join(cache_dir, "docmap.pkl")
         tf_path = os.path.join(cache_dir, "term_frequencies.pkl")
-        if not (os.path.exists(index_path) and os.path.exists(docmap_path) and os.path.exists(tf_path)):
-            raise FileNotFoundError("Index, docmap, or term_frequencies file not found in cache directory.")
+        if not (os.path.exists(index_path) and os.path.exists(docmap_path) and os.path.exists(tf_path) and os.path.exists(self.doc_lengths_path)):
+            raise FileNotFoundError("Index, docmap, term_frequencies, or doc_lengths file not found in cache directory.")
         with open(index_path, "rb") as f:
             self.index = pickle.load(f)
         with open(docmap_path, "rb") as f:
             self.docmap = pickle.load(f)
         with open(tf_path, "rb") as f:
             self.term_frequencies = pickle.load(f)
+        with open(self.doc_lengths_path, "rb") as f:
+            self.doc_lengths = pickle.load(f)
 
     def get_tf(self, doc_id, term):
         """
@@ -153,11 +166,23 @@ class InvertedIndex:
         bm25_idf = math.log((N - df + 0.5) / (df + 0.5) + 1)
         return bm25_idf
 
-    def get_bm25_tf(self, doc_id, term, k1=1.5):
+    def get_bm25_tf(self, doc_id, term, k1=1.5, b=0.75):
         """
-        Calculate and return the BM25 saturated TF for a given document and term.
-        Uses formula: (tf * (k1 + 1)) / (tf + k1)
+        Calculate and return the BM25 saturated TF with length normalization.
+        Uses formula: (tf * (k1 + 1)) / (tf + k1 * (1 - b + b * (doc_len / avg_doc_len)))
         """
         tf = self.get_tf(doc_id, term)
-        bm25_tf = (tf * (k1 + 1)) / (tf + k1)
+        doc_len = self.doc_lengths.get(doc_id, 0)
+        avg_doc_len = self.__get_avg_doc_length()
+        length_norm = 1 - b + b * (doc_len / avg_doc_len) if avg_doc_len > 0 else 1
+        bm25_tf = (tf * (k1 + 1)) / (tf + k1 * length_norm)
         return bm25_tf
+
+    def __get_avg_doc_length(self) -> float:
+        """
+        Calculate and return the average document length across all documents.
+        Returns 0.0 if there are no documents.
+        """
+        if not self.doc_lengths:
+            return 0.0
+        return sum(self.doc_lengths.values()) / len(self.doc_lengths)
