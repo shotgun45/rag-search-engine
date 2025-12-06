@@ -7,7 +7,7 @@ from pathlib import Path
 # Add parent directory to path to import lib modules
 sys.path.insert(0, str(Path(__file__).parent))
 
-from lib.semantic_search import verify_model, embed_text
+from lib.semantic_search import verify_model, embed_text, verify_embeddings
 
 def main():
     parser = argparse.ArgumentParser(description="Semantic Search CLI")
@@ -18,6 +18,8 @@ def main():
     embed_text_parser = subparsers.add_parser("embed_text", help="Generate embedding for input text")
     embed_text_parser.add_argument("text", type=str, help="Text to generate embedding for")
 
+    verify_embeddings_parser = subparsers.add_parser("verify_embeddings", help="Verify movie embeddings")
+
     args = parser.parse_args()
 
     match args.command:
@@ -25,6 +27,8 @@ def main():
             verify_model()
         case "embed_text":
             embed_text(args.text)
+        case "verify_embeddings":
+            verify_embeddings()
         case _:
             parser.print_help()
 
