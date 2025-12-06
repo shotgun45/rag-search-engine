@@ -112,6 +112,20 @@ def embed_text(text):
     print(f"Dimensions: {embedding.shape[0]}")
 
 
+def embed_query_text(query):
+    """
+    Generate and display embedding information for a query.
+    
+    Args:
+        query: The query text to generate an embedding for.
+    """
+    search = SemanticSearch()
+    embedding = search.generate_embedding(query)
+    print(f"Query: {query}")
+    print(f"First 5 dimensions: {embedding[:5]}")
+    print(f"Shape: {embedding.shape}")
+
+
 def verify_embeddings():
     """
     Load or create embeddings for all movies and display information.
