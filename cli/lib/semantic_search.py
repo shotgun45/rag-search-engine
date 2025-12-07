@@ -88,6 +88,48 @@ class SemanticSearch:
         # Rebuild embeddings if cache doesn't exist or doesn't match
         return self.build_embeddings(documents)
 
+    def search(self, query, limit):
+        """
+        Search for documents similar to the query using cosine similarity.
+        
+        Args:
+            query: The search query string.
+            limit: Maximum number of results to return.
+            
+        Returns:
+            List of dictionaries containing score, title, and description.
+            
+        Raises:
+            ValueError: If embeddings are not loaded.
+        """
+        if self.embeddings is None:
+            raise ValueError("No embeddings loaded. Call `load_or_create_embeddings` first.")
+        
+        # Generate embedding for the query
+        query_embedding = self.generate_embedding(query)
+        
+        # Calculate cosine similarity between query and all document embeddings
+        # Cosine similarity = dot product of normalized vectors
+        query_norm = query_embedding / np.linalg.norm(query_embedding)
+        doc_norms = self.embeddings / np.linalg.norm(self.embeddings, axis=1, keepdims=True)
+        similarities = np.dot(doc_norms, query_norm)
+        
+        # Create list of (similarity_score, document) tuples
+        results = [(similarities[i], self.documents[i]) for i in range(len(self.documents))]
+        
+        # Sort by similarity score in descending order
+        results.sort(key=lambda x: x[0], reverse=True)
+        
+        # Return top results with score, title, and description
+        return [
+            {
+                'score': score,
+                'title': doc['title'],
+                'description': doc['description']
+            }
+            for score, doc in results[:limit]
+        ]
+
 
 def verify_model():
     """
@@ -147,3 +189,14 @@ def verify_embeddings():
     # Print verification info
     print(f"Number of docs:   {len(documents)}")
     print(f"Embeddings shape: {embeddings.shape[0]} vectors in {embeddings.shape[1]} dimensions")
+
+
+def cosine_similarity(vec1, vec2):
+    dot_product = np.dot(vec1, vec2)
+    norm1 = np.linalg.norm(vec1)
+    norm2 = np.linalg.norm(vec2)
+
+    if norm1 == 0 or norm2 == 0:
+        return 0.0
+
+    return dot_product / (norm1 * norm2)
