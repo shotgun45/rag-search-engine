@@ -31,6 +31,7 @@ def main():
     chunk_parser = subparsers.add_parser("chunk", help="Chunk text into smaller pieces")
     chunk_parser.add_argument("text", type=str, help="Text to chunk")
     chunk_parser.add_argument("--chunk-size", type=int, default=200, help="Number of words per chunk (default: 200)")
+    chunk_parser.add_argument("--overlap", type=int, default=0, help="Number of overlapping words between chunks (default: 0)")
 
     args = parser.parse_args()
 
@@ -72,11 +73,17 @@ def main():
             # Split text into words
             words = args.text.split()
             
-            # Create chunks of specified size
+            # Create chunks with overlap
             chunks = []
-            for i in range(0, len(words), args.chunk_size):
+            i = 0
+            while i < len(words):
                 chunk = " ".join(words[i:i + args.chunk_size])
                 chunks.append(chunk)
+                i += args.chunk_size - args.overlap
+                
+                # Prevent infinite loop if overlap >= chunk_size
+                if args.overlap >= args.chunk_size:
+                    break
             
             # Print results
             print(f"Chunking {len(args.text)} characters")
