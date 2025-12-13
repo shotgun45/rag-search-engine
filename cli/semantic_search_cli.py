@@ -33,6 +33,11 @@ def main():
     chunk_parser.add_argument("--chunk-size", type=int, default=200, help="Number of words per chunk (default: 200)")
     chunk_parser.add_argument("--overlap", type=int, default=0, help="Number of overlapping words between chunks (default: 0)")
 
+    semantic_chunk_parser = subparsers.add_parser("semantic_chunk", help="Chunk text into sentence-based chunks")
+    semantic_chunk_parser.add_argument("text", type=str, help="Text to semantically chunk")
+    semantic_chunk_parser.add_argument("--max-chunk-size", type=int, default=4, help="Maximum number of sentences per chunk (default: 4)")
+    semantic_chunk_parser.add_argument("--overlap", type=int, default=0, help="Number of overlapping sentences between chunks (default: 0)")
+
     args = parser.parse_args()
 
     match args.command:
@@ -87,6 +92,20 @@ def main():
             
             # Print results
             print(f"Chunking {len(args.text)} characters")
+            for idx, chunk in enumerate(chunks, 1):
+                print(f"{idx}. {chunk}")
+        case "semantic_chunk":
+            import re
+            sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", args.text) if s.strip()]
+            chunks = []
+            i = 0
+            while i < len(sentences):
+                chunk = " ".join(sentences[i:i + args.max_chunk_size])
+                chunks.append(chunk)
+                i += args.max_chunk_size - args.overlap
+                if args.overlap >= args.max_chunk_size:
+                    break
+            print(f"Semantically chunking {len(args.text)} characters")
             for idx, chunk in enumerate(chunks, 1):
                 print(f"{idx}. {chunk}")
         case _:
