@@ -7,7 +7,7 @@ from pathlib import Path
 # Add parent directory to path to import lib modules
 sys.path.insert(0, str(Path(__file__).parent))
 
-from lib.semantic_search import verify_model, embed_text, verify_embeddings, embed_query_text, SemanticSearch
+from lib.semantic_search import verify_model, embed_text, verify_embeddings, embed_query_text, SemanticSearch, ChunkedSemanticSearch
 import json
 
 def main():
@@ -37,6 +37,8 @@ def main():
     semantic_chunk_parser.add_argument("text", type=str, help="Text to semantically chunk")
     semantic_chunk_parser.add_argument("--max-chunk-size", type=int, default=4, help="Maximum number of sentences per chunk (default: 4)")
     semantic_chunk_parser.add_argument("--overlap", type=int, default=0, help="Number of overlapping sentences between chunks (default: 0)")
+
+    embed_chunks_parser = subparsers.add_parser("embed_chunks", help="Generate chunk embeddings for movie documents")
 
     args = parser.parse_args()
 
@@ -108,6 +110,21 @@ def main():
             print(f"Semantically chunking {len(args.text)} characters")
             for idx, chunk in enumerate(chunks, 1):
                 print(f"{idx}. {chunk}")
+        case "embed_chunks":
+            # Load movies from JSON
+            movies_path = Path(__file__).parent.parent / "data" / "movies.json"
+            with open(movies_path, "r") as f:
+                data = json.load(f)
+            documents = data["movies"]
+            
+            # Initialize ChunkedSemanticSearch instance
+            chunked_search = ChunkedSemanticSearch()
+            
+            # Load or build chunk embeddings
+            embeddings = chunked_search.load_or_create_chunk_embeddings(documents)
+            
+            # Print info about embeddings
+            print(f"Generated {len(embeddings)} chunked embeddings")
         case _:
             parser.print_help()
 

@@ -1,6 +1,8 @@
 from sentence_transformers import SentenceTransformer
 import numpy as np
 import os
+import json
+import re
 from pathlib import Path
 
 
@@ -200,3 +202,147 @@ def cosine_similarity(vec1, vec2):
         return 0.0
 
     return dot_product / (norm1 * norm2)
+
+
+class ChunkedSemanticSearch(SemanticSearch):
+    DEFAULT_SEMANTIC_CHUNK_SIZE = 4
+    DEFAULT_CHUNK_OVERLAP = 1
+    
+    def __init__(self, model_name="all-MiniLM-L6-v2") -> None:
+        super().__init__()
+        self.model = SentenceTransformer(model_name)
+        self.chunk_embeddings = None
+        self.chunk_metadata = None
+
+    def semantic_chunk(self, text, max_chunk_size=None, overlap=None):
+        """
+        Split text into sentence-based chunks with overlap.
+        
+        Args:
+            text: The text to chunk.
+            max_chunk_size: Maximum number of sentences per chunk.
+            overlap: Number of overlapping sentences between chunks.
+            
+        Returns:
+            List of text chunks.
+        """
+        if max_chunk_size is None:
+            max_chunk_size = self.DEFAULT_SEMANTIC_CHUNK_SIZE
+        if overlap is None:
+            overlap = self.DEFAULT_CHUNK_OVERLAP
+            
+        # Split into sentences
+        sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", text) if s.strip()]
+        
+        # Create chunks with overlap
+        chunks = []
+        i = 0
+        while i < len(sentences):
+            # Get the chunk
+            chunk_sentences = sentences[i:i + max_chunk_size]
+            if not chunk_sentences:
+                break
+            
+            # Skip tiny trailing chunks
+            if chunks and len(chunk_sentences) <= overlap:
+                break
+                
+            chunk = " ".join(chunk_sentences)
+            chunks.append(chunk)
+            
+            # Move to next chunk position
+            i += max_chunk_size - overlap
+            
+            # Prevent infinite loop
+            if overlap >= max_chunk_size:
+                break
+        
+        return chunks
+
+    def build_chunk_embeddings(self, documents):
+        """
+        Generate embeddings for document chunks and save to disk.
+        
+        Args:
+            documents: List of document dictionaries (movies).
+            
+        Returns:
+            The generated chunk embeddings.
+        """
+        # Populate documents and document_map
+        self.documents = documents
+        self.document_map = {}
+        for doc in documents:
+            self.document_map[doc['id']] = doc
+        
+        # Create lists for chunks and metadata
+        all_chunks = []
+        chunk_metadata = []
+        
+        # Process each document
+        for movie_idx, doc in enumerate(documents):
+            description = doc.get('description', '').strip()
+            
+            # Skip if description is empty
+            if not description:
+                continue
+            
+            # Use semantic_chunk method to split into chunks
+            doc_chunks = self.semantic_chunk(description, max_chunk_size=4, overlap=1)
+            
+            # Add chunks and metadata
+            total_chunks = len(doc_chunks)
+            for chunk_idx, chunk in enumerate(doc_chunks):
+                all_chunks.append(chunk)
+                chunk_metadata.append({
+                    'movie_idx': movie_idx,
+                    'chunk_idx': chunk_idx,
+                    'total_chunks': total_chunks
+                })
+        
+        # Generate embeddings for all chunks
+        self.chunk_embeddings = self.model.encode(all_chunks, show_progress_bar=True)
+        self.chunk_metadata = chunk_metadata
+        
+        # Save to cache
+        os.makedirs('cache', exist_ok=True)
+        np.save('cache/chunk_embeddings.npy', self.chunk_embeddings)
+        
+        with open('cache/chunk_metadata.json', 'w') as f:
+            json.dump({"chunks": chunk_metadata, "total_chunks": len(all_chunks)}, f, indent=2)
+        
+        return self.chunk_embeddings
+
+    def load_or_create_chunk_embeddings(self, documents: list[dict]) -> np.ndarray:
+        """
+        Load chunk embeddings from cache if available, otherwise build them.
+        
+        Args:
+            documents: List of document dictionaries (movies).
+            
+        Returns:
+            The chunk embeddings (either loaded or newly created).
+        """
+        # Populate documents and document_map
+        self.documents = documents
+        self.document_map = {}
+        for doc in documents:
+            self.document_map[doc['id']] = doc
+        
+        # Check if cached embeddings and metadata exist
+        embeddings_path = 'cache/chunk_embeddings.npy'
+        metadata_path = 'cache/chunk_metadata.json'
+        
+        if os.path.exists(embeddings_path) and os.path.exists(metadata_path):
+            # Load embeddings
+            self.chunk_embeddings = np.load(embeddings_path)
+            
+            # Load metadata
+            with open(metadata_path, 'r') as f:
+                metadata_json = json.load(f)
+                self.chunk_metadata = metadata_json['chunks']
+            
+            return self.chunk_embeddings
+        
+        # Rebuild embeddings if cache doesn't exist
+        return self.build_chunk_embeddings(documents)
