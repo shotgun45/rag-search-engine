@@ -346,3 +346,72 @@ class ChunkedSemanticSearch(SemanticSearch):
         
         # Rebuild embeddings if cache doesn't exist
         return self.build_chunk_embeddings(documents)
+
+    def search_chunks(self, query: str, limit: int = 10):
+        """
+        Search for documents using chunk embeddings and aggregate results.
+        
+        Args:
+            query: The search query string.
+            limit: Maximum number of results to return.
+            
+        Returns:
+            List of dictionaries containing id, title, document, score, and metadata.
+            
+        Raises:
+            ValueError: If chunk embeddings are not loaded.
+        """
+        if self.chunk_embeddings is None:
+            raise ValueError("No chunk embeddings loaded. Call `load_or_create_chunk_embeddings` first.")
+        
+        # Generate embedding for the query
+        query_embedding = self.generate_embedding(query)
+        
+        # Calculate cosine similarity for each chunk
+        chunk_scores = []
+        for i, chunk_embedding in enumerate(self.chunk_embeddings):
+            # Calculate cosine similarity
+            similarity = np.dot(query_embedding, chunk_embedding) / (
+                np.linalg.norm(query_embedding) * np.linalg.norm(chunk_embedding)
+            )
+            
+            # Get metadata for this chunk
+            metadata = self.chunk_metadata[i]
+            
+            chunk_scores.append({
+                'chunk_idx': metadata['chunk_idx'],
+                'movie_idx': metadata['movie_idx'],
+                'score': similarity
+            })
+        
+        # Aggregate scores by movie (keep highest score per movie)
+        movie_scores = {}
+        for chunk_score in chunk_scores:
+            movie_idx = chunk_score['movie_idx']
+            score = chunk_score['score']
+            
+            if movie_idx not in movie_scores or score > movie_scores[movie_idx]:
+                movie_scores[movie_idx] = score
+        
+        # Sort movie scores by score descending
+        sorted_movie_scores = sorted(movie_scores.items(), key=lambda x: x[1], reverse=True)
+        
+        # Take top limit movies
+        top_movies = sorted_movie_scores[:limit]
+        
+        # Format results
+        SCORE_PRECISION = 4
+        results = []
+        for movie_idx, score in top_movies:
+            doc = self.documents[movie_idx]
+            description = doc.get('description', '')
+            
+            results.append({
+                'id': doc['id'],
+                'title': doc['title'],
+                'document': description[:100],
+                'score': round(score, SCORE_PRECISION),
+                'metadata': {}
+            })
+        
+        return results
