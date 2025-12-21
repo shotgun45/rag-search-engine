@@ -230,9 +230,20 @@ class ChunkedSemanticSearch(SemanticSearch):
             max_chunk_size = self.DEFAULT_SEMANTIC_CHUNK_SIZE
         if overlap is None:
             overlap = self.DEFAULT_CHUNK_OVERLAP
-            
+        
+        # Strip leading and trailing whitespace from input
+        text = text.strip()
+        
+        # Return empty list if nothing left
+        if not text:
+            return []
+        
         # Split into sentences
         sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", text) if s.strip()]
+        
+        # If only one sentence and it doesn't end with punctuation, treat whole text as one sentence
+        if len(sentences) == 1 and not re.search(r"[.!?]$", sentences[0]):
+            sentences = [text]
         
         # Create chunks with overlap
         chunks = []
@@ -246,9 +257,13 @@ class ChunkedSemanticSearch(SemanticSearch):
             # Skip tiny trailing chunks
             if chunks and len(chunk_sentences) <= overlap:
                 break
-                
-            chunk = " ".join(chunk_sentences)
-            chunks.append(chunk)
+            
+            # Join chunk sentences and strip whitespace
+            chunk = " ".join(chunk_sentences).strip()
+            
+            # Only append if chunk has content after stripping
+            if chunk:
+                chunks.append(chunk)
             
             # Move to next chunk position
             i += max_chunk_size - overlap
